@@ -1,0 +1,32 @@
+syntax = "proto3";
+
+// Package name for the generated Go code
+package rollercoaster;
+option go_package = "./rollercoaster";
+
+// The central Station service.
+service Station {
+  // Called by a Wagon. Blocks for the entire ride cycle.
+  rpc Departure(WagonRequest) returns (RideReply);
+
+  // Called by a Passenger. Blocks until the ride is over.
+  rpc IAmBoarding(PassengerRequest) returns (RideReply);
+
+  // Called by a Passenger after IAmBoarding returns.
+  rpc IAmDisembarking(PassengerRequest) returns (RideReply);
+}
+
+// Message for a wagon to identify itself
+message WagonRequest {
+  int32 wagon_id = 1;
+}
+
+// Message for a passenger to identify itself
+message PassengerRequest {
+  int32 passenger_id = 1;
+}
+
+// A generic, empty reply to signify success
+message RideReply {
+  // This is empty, as a successful return is all we need.
+}
