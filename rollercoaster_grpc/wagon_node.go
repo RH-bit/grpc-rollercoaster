@@ -13,17 +13,17 @@ import (
 	pb "rollercoaster_grpc/rollercoaster"
 )
 
-const SERVER_ADDR = "localhost:8000"
+//const SERVER_ADDR = "localhost:8000"
 
 // connect dials the gRPC server and returns a client stub
-func connectWagon(wagonID int) (pb.StationClient, *grpc.ClientConn) {
+func connectWagon(wagonID int, serverAdr string) (pb.StationClient, *grpc.ClientConn) {
 	var conn *grpc.ClientConn
 	var err error
 
 	// We'll retry connecting indefinitely
 	for {
 		// Dial without SSL/TLS (insecure)
-		conn, err = grpc.NewClient(SERVER_ADDR, grpc.WithTransportCredentials(insecure.NewCredentials()))
+		conn, err = grpc.NewClient(serverAdr, grpc.WithTransportCredentials(insecure.NewCredentials()))
 		if err == nil {
 			// Success!
 			log.Printf("[Wagon %d]: Connected to server.", wagonID)
@@ -36,7 +36,7 @@ func connectWagon(wagonID int) (pb.StationClient, *grpc.ClientConn) {
 }
 
 func main() {
-	if len(os.Args) != 2 {
+	if len(os.Args) < 2 {
 		log.Fatalf("Usage: go run wagon_node.go <wagon_id>")
 	}
 	wagonID, err := strconv.Atoi(os.Args[1])
@@ -44,8 +44,13 @@ func main() {
 		log.Fatalf("<wagon_id> must be an integer: %v", err)
 	}
 
-	log.Printf("[Wagon %d]: Node started. Connecting...", wagonID)
-	client, conn := connectWagon(wagonID)
+	serverAdr := "localhost:8000"
+	if len(os.Args) >= 3 {
+		serverAdr = os.Args[2]
+	}
+
+	log.Printf("[Wagon %d]: Node started. Connecting...", wagonID, serverAdr)
+	client, conn := connectWagon(wagonID, serverAdr)
 	defer conn.Close()
 
 	for {
@@ -61,7 +66,7 @@ func main() {
 			log.Printf("[Wagon %d]: RPC error: %v. Reconnecting...", wagonID, err)
 			// Connection is broken. Close it and reconnect.
 			conn.Close()
-			client, conn = connectWagon(wagonID)
+			client, conn = connectWagon(wagonID, serverAdr)
 			continue // Retry the loop
 		}
 

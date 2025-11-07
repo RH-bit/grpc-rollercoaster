@@ -14,7 +14,7 @@ import (
 	pb "rollercoaster_grpc/rollercoaster"
 )
 
-const SERVER_ADDR = "localhost:8000"
+//const SERVER_ADDR = "localhost:8000"
 
 // connect dials the gRPC server and returns a client stub
 func connectPassenger(passengerID int) (pb.StationClient, *grpc.ClientConn) {
@@ -64,7 +64,6 @@ func main() {
 		//    This *MUST* succeed before we continue to the park.
 		log.Printf("[Pass %d]: Disembarking...", passengerID)
 
-		// --- START FIX ---
 		// Wrap disembark in its own retry loop
 		for {
 			_, err = client.IAmDisembarking(context.Background(), req)
@@ -78,7 +77,6 @@ func main() {
 			client, conn = connectPassenger(passengerID)
 			time.Sleep(1 * time.Second) // Small backoff before retry
 		}
-		// --- END FIX ---
 
 		// 3. Simulate "enjoying the park" before queuing again
 		wait_time := time.Duration(r.Intn(4000)+1000) * time.Millisecond

@@ -86,8 +86,6 @@ func (s *stationServer) Departure(ctx context.Context, req *pb.WagonRequest) (*p
 	s.lock.Lock()
 	defer s.lock.Unlock()
 
-	// --- LOGIC IS 100% IDENTICAL TO THE net/rpc SOLUTION ---
-
 	// 1. Wait for this wagon's turn
 	for wagonID != s.wagonTurn {
 		log.Printf("[Wagon %d]: Waiting for my turn (current: %d).\n", wagonID, s.wagonTurn)
@@ -95,7 +93,7 @@ func (s *stationServer) Departure(ctx context.Context, req *pb.WagonRequest) (*p
 	}
 
 	// 2. It's our turn. Announce boarding.
-	log.Printf("✅ [Wagon %d]: It's my turn! Opening doors for %d passengers.\n", wagonID, s.cCapacity)
+	log.Printf("[Wagon %d]: It's my turn! Opening doors for %d passengers.\n", wagonID, s.cCapacity)
 	s.currentWagonID = wagonID
 	s.boardingAllowed = true
 
@@ -104,7 +102,7 @@ func (s *stationServer) Departure(ctx context.Context, req *pb.WagonRequest) (*p
 
 	// 4. Wait until 'c' passengers have boarded
 	for s.passengersOnboard < s.cCapacity {
-		log.Printf("   [Wagon %d]: Waiting for passengers... (%d/%d)\n", wagonID, s.passengersOnboard, s.cCapacity)
+		log.Printf("[Wagon %d]: Waiting for passengers... (%d/%d)\n", wagonID, s.passengersOnboard, s.cCapacity)
 		s.wagonFullCv.Wait()
 	}
 
@@ -113,24 +111,24 @@ func (s *stationServer) Departure(ctx context.Context, req *pb.WagonRequest) (*p
 	s.lock.Unlock() // Release lock for the ride
 
 	// --- Simulate Ride ---
-	log.Printf("🎢 [Wagon %d]: Weeeee! Ride in progress...\n", wagonID)
+	log.Printf("[Wagon %d]: Weeeee! Ride in progress...\n", wagonID)
 	time.Sleep(RIDE_DURATION)
 	// --- End Ride ---
 
 	s.lock.Lock() // Re-acquire lock
-	log.Printf("🎢 [Wagon %d]: Ride finished. Arriving at station.\n", wagonID)
+	log.Printf("[Wagon %d]: Ride finished. Arriving at station.\n", wagonID)
 
 	// 6. Signal 'c' passengers to disembark.
 	s.rideFinishedCv.Broadcast()
 
 	// 7. Wait for all 'c' passengers to disembark
 	for s.passengersDisembarked < s.cCapacity {
-		log.Printf("   [Wagon %d]: Waiting for passengers to get off... (%d/%d)\n", wagonID, s.passengersDisembarked, s.cCapacity)
+		log.Printf("[Wagon %d]: Waiting for passengers to get off... (%d/%d)\n", wagonID, s.passengersDisembarked, s.cCapacity)
 		s.wagonEmptyCv.Wait()
 	}
 
 	// 8. Reset for the next run.
-	log.Printf("✅ [Wagon %d]: All passengers are off. Wagon is empty.\n", wagonID)
+	log.Printf("[Wagon %d]: All passengers are off. Wagon is empty.\n", wagonID)
 	s.passengersOnboard = 0
 	s.passengersDisembarked = 0
 	s.currentWagonID = -1
@@ -150,11 +148,9 @@ func (s *stationServer) IAmBoarding(ctx context.Context, req *pb.PassengerReques
 	s.lock.Lock()
 	defer s.lock.Unlock()
 
-	// --- LOGIC IS 100% IDENTICAL TO THE net/rpc SOLUTION ---
-
 	// 1. Get in the FCFS queue
 	myQueueTicket := s.passengersWaitingQueue.PushBack(passengerID)
-	log.Printf("  [Pass %d]: In queue. (Queue size: %d)\n", passengerID, s.passengersWaitingQueue.Len())
+	log.Printf("[Pass %d]: In queue. (Queue size: %d)\n", passengerID, s.passengersWaitingQueue.Len())
 
 	// 2. Wait until it's our turn to board
 	for !s.boardingAllowed || s.passengersWaitingQueue.Front() != myQueueTicket || s.passengersOnboard >= s.cCapacity {
@@ -164,11 +160,11 @@ func (s *stationServer) IAmBoarding(ctx context.Context, req *pb.PassengerReques
 	// 3. It's my turn to board!
 	s.passengersWaitingQueue.Remove(myQueueTicket)
 	s.passengersOnboard++
-	log.Printf("  [Pass %d]: Boarding Wagon %d! (On board: %d)\n", passengerID, s.currentWagonID, s.passengersOnboard)
+	log.Printf("[Pass %d]: Boarding Wagon %d! (On board: %d)\n", passengerID, s.currentWagonID, s.passengersOnboard)
 
 	// 4. If I am the last passenger, signal the waiting wagon
 	if s.passengersOnboard == s.cCapacity {
-		log.Printf("  [Pass %d]: I'm the last one! Telling wagon to go.\n", passengerID)
+		log.Printf("[Pass %d]: I'm the last one! Telling wagon to go.\n", passengerID)
 		s.wagonFullCv.Signal()
 		s.boardingAllowed = false // Stop boarding
 	}
@@ -176,7 +172,7 @@ func (s *stationServer) IAmBoarding(ctx context.Context, req *pb.PassengerReques
 	// 5. Wait for the ride to finish
 	s.rideFinishedCv.Wait()
 
-	log.Printf("  [Pass %d]: Ride is over!\n", passengerID)
+	log.Printf("[Pass %d]: Ride is over!\n", passengerID)
 	return &pb.RideReply{}, nil
 }
 
@@ -186,14 +182,12 @@ func (s *stationServer) IAmDisembarking(ctx context.Context, req *pb.PassengerRe
 	s.lock.Lock()
 	defer s.lock.Unlock()
 
-	// --- LOGIC IS 100% IDENTICAL TO THE net/rpc SOLUTION ---
-
 	s.passengersDisembarked++
-	log.Printf("  [Pass %d]: Getting off. (Off: %d)\n", passengerID, s.passengersDisembarked)
+	log.Printf("[Pass %d]: Getting off. (Off: %d)\n", passengerID, s.passengersDisembarked)
 
 	// 2. If I am the last passenger off, signal the waiting wagon
 	if s.passengersDisembarked == s.cCapacity {
-		log.Printf("  [Pass %d]: I'm the last one off!\n", passengerID)
+		log.Printf("[Pass %d]: I'm the last one off!\n", passengerID)
 		s.wagonEmptyCv.Signal()
 	}
 
@@ -218,7 +212,7 @@ func main() {
 	pb.RegisterStationServer(grpcServer, s)
 
 	// 5. Start the server
-	log.Printf("🚉 Station gRPC server listening on %s\n", SERVER_ADDR)
+	log.Printf("Station gRPC server listening on %s\n", SERVER_ADDR)
 	if err := grpcServer.Serve(lis); err != nil {
 		log.Fatalf("Failed to serve: %v", err)
 	}
